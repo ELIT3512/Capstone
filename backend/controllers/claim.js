@@ -1,49 +1,83 @@
 const models = require('../models');
 
-
 module.exports = {
     get: (req, res, next) => {
         models.Claim.find().populate('owner')
-            .then((Claims) => res.send(Claims))
+            .then((claims) => res.send(claims))
             .catch(next);
     },
-    post: (req, res, next) => {
-       
+
+    getById: (req, res, next) => {
+        const id = req.params.id;
+        models.Claim.findById(id).populate('owner')
+            .then((claim) => {
+                if (!claim) return res.status(404).send({ message: "Claim not found" });
+                res.send(claim);
+            })
+            .catch(next);
+    },
+
+    post: {
+        createClaim: (req, res, next) => {
+            console.log("CCReqBody", req.body);
+
+            console.log("Request Body:", req.body);
+            console.log("Authenticated User:", req.user);
 
             const { MedicalProvider, DescriptionOfClaim, Price } = req.body;
-            const { _id } = req.user;
+            if (!MedicalProvider || !DescriptionOfClaim || !Price) {
+                return res.status(400).json({ message: "Missing required fields" });
+            }
 
-            // Create Claim with the relative path to the image
-           
+            const { _id } = req.user; // Authenticated user ID
+
+            // Create the claim
             models.Claim.create({
                 MedicalProvider,
                 DescriptionOfClaim,
                 Price,
-                owner: _id
+                owner: _id,
             })
-            .then((createdClaim) => {
-                return Promise.all([
-                    models.User.updateOne({ _id:_id }, { $push: { Claims: createdClaim._id } }),
-                    models.Claim.findOne({ _id: createdClaim._id })
-                ]);
-            })
-            .then(([_, ClaimObj]) => {
-                res.send(ClaimObj);
-            })
-            .catch(next);
-        
+                .then((createdClaim) => {
+                    console.log("Claim created successfully:", createdClaim);
+
+                    // Update the user's claims array
+                    return models.User.updateOne(
+                        { _id: _id },
+                        { $push: { claims: createdClaim._id } }
+                    ).then(() => createdClaim);
+                })
+                .then((createdClaim) => {
+                    console.log("User updated successfully");
+                    res.status(201).json({ message: "Claim created successfully", createdClaim });
+                })
+                .catch((error) => {
+                    console.error("Error during claim creation:", error);
+                    next(error); // Pass error to the global error handler
+                });
+        },
     },
+
     put: (req, res, next) => {
         const id = req.params.id;
-        const {MedicalProvider, DescriptionOfClaim,Price} = req.body;
-        models.Claim.updateOne({ _id: id }, {MedicalProvider, DescriptionOfClaim,price})
-            .then((updatedClaim) => res.send(updatedClaim))
-            .catch(next)
+        const { MedicalProvider, DescriptionOfClaim, Price } = req.body;
+
+        models.Claim.findByIdAndUpdate(id, { MedicalProvider, DescriptionOfClaim, Price }, { new: true })
+            .then((updatedClaim) => {
+                if (!updatedClaim) return res.status(404).send({ message: "Claim not found" });
+                res.send(updatedClaim);
+            })
+            .catch(next);
     },
+
     delete: (req, res, next) => {
         const id = req.params.id;
-        models.Claim.deleteOne({ _id: id })
-            .then((removedClaim) => res.send(removedClaim))
-            .catch(next)
+
+        models.Claim.findByIdAndDelete(id)
+            .then((deletedClaim) => {
+                if (!deletedClaim) return res.status(404).send({ message: "Claim not found" });
+                res.send({ message: "Claim deleted successfully", deletedClaim });
+            })
+            .catch(next);
     }
 };
