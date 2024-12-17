@@ -1,29 +1,29 @@
 const models = require('../models');
 const config = require('../config/config');
-// const jwt = require('../utils/jwt');
+const jwt = require('../utils/jwt');
 
 module.exports = {
-    get: (req, res, next) => {
-        //         const token = req.headers.authorization.split(' ')[1];
-        // console.log("getToken",token)
-        // jwt.verifyToken(token)
-        // .then(decoded =>{
-        //     console.log("Decoded",decoded);
-        // const userId = decoded.id
-        // console.log("userId",userId)
-        // models.User.findById(userId).populate("claims")
-        // models.User.findById(userId)
-        //   .then((user) => {
-        //     if (!user) {
-        //       return res.status(404).send('find user error');
-        //     }
-        //     res.send(user);
-        //   })
-        //   .catch(next);
-        // })
-    },
+  get:  (req, res, next) => {
+    const token = req.headers.authorization.split(' ')[1];
+    console.log("getToken",token)
+    jwt.verifyToken(token)
+    .then(decoded =>{
+    console.log("Decoded",decoded);
+    const userId = decoded.id
+    console.log("userId",userId)
+    models.User.findById(userId).populate("claims")
+    .then((user) => {
+    if (!user) {
+      return res.status(404).send('find user error');
+    }
+    res.send(user);
+    })
+    .catch(next);
+    })
+  },
+  
       
-    post: {
+  post: {
     
     register: (req, res, next) => {
                     console.log("req",req.body)
@@ -44,33 +44,37 @@ module.exports = {
                             res.status(400).json({ message: 'Error registering user', error: err.message });
                         });
                 },         
-    // login: (req, res, next) => {
-    //         const { username, password } = req.body;
-    //         models.User.findOne({ username })
-    //         // .populate('product')
-    //             .then((user) => Promise.all([user, user.matchPassword(password)]))
-    //             .then(([user, match]) => {
-    //                 if (!match) {
-    //                     res.status(401).send('Invalid password');
-    //                     return;}
-    //                 const token = jwt.createToken({ id: user._id,username: user.username });
-    //                 console.log("user", user)
-    //                 res.json({ ...user.doc,token });
-    //             }).catch(next);},
-    // logout: (req, res, next) => {
-    //         const authHeader = req.headers.authorization;
-    //         if (!authHeader) {
-    //             return res.status(401).send('No token provided');
-    //         }
-    //         const token = authHeader.split(' ')[1];
-    //         console.log('-'.repeat(100));
-    //         console.log(token);
-    //         console.log('-'.repeat(100));
-    //         models.TokenBlacklist.create({ token })
-    //             .then(() => {
-    //                 res.clearCookie("token").send('Logout successfully!');
-    //             }).catch(next);}
-    },
+    login: (req, res, next) => {
+        const { username, password } = req.body;
+    
+        // Find the user by username
+        models.User.findOne({ username })
+            .then((user) => {
+ 
+                if (!user) {
+                    return res.status(404).json({ message: 'User not found. Please try again.' });
+                }
+                return user.matchPassword(password).then((match) => {
+                    if (!match) {
+                        return res.status(401).json({ message: 'Invalid password. Please try again.' });
+                    }
+                    const token = jwt.createToken({ id: user._id, username: user.username });
+                    res.json({ token, user: user.doc });
+                });
+            })
+            .catch(next);
+            },
+      
+    logout: (req, res) => {
+                const authHeader = req.headers.authorization;
+                if (!authHeader) {
+                    return res.status(401).send('No token provided');
+                }
+                const token = authHeader.split(' ')[1];
+                console.log("Logout token:", token);
+                res.clearCookie('token').send('Logout successfully!');
+            }
+        },
     put: (req, res, next) => {
                     const id = req.params.id;
                         // Find the user by ID
@@ -95,4 +99,6 @@ module.exports = {
             .then((removedUser) => res.send(removedUser))
             .catch(next)
     }
+  
+ 
 };
